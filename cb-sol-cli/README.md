@@ -6,19 +6,19 @@ This CLI supports on-chain interactions with components of ChainBridge.
 
 Installation requires the ABI files from the contracts which will be fetched and built from the chainbridge-solidity repo.
 ```
-$ make install
+$ make build
 ```
 
 ## Usage 
 
-The root command (`cb-sol-cli`) has some options:
+The executable (`./index.js`) has some options:
 ```
 --url <value>                 URL to connect to
 --gasLimit <value>            Gas limit for transactions 
 --gasPrice <value>            Gas price for transactions 
 --networkId <value>	      Network id
 ```
-\
+ 
 The keypair used for interactions can be configured with:
 ```
 --privateKey <value>           Private key to use
