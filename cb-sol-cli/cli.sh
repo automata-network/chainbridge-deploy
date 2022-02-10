@@ -92,8 +92,12 @@ function approve() {
 }
 
 function gen_config() {
+	n=$1
+	if [[ "$n" == "" ]]; then
+		n=1
+	fi
 	source ./config-tmpl.sh
-	pk=$(echo $RELAYERS_PRIVATE_KEY | _to_list 1)
+	pk=$(echo $RELAYERS_PRIVATE_KEY | _to_list $n | tail -n 1)
 	_tmpl_header
 	__comma=""
 	echo $NETWORKS | _to_list | while read name; do 
@@ -116,6 +120,14 @@ function deploy() {
 		return 1
 	fi
 	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --erc20Handler --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME}
+}
+
+function add_token() {
+	if [[ "$DEPLOY_ACCOUNT_PRIVATE_KEY" == "" ]]; then
+		echo "missing env DEPLOY_ACCOUNT_PRIVATE_KEY" >&2
+		return 1
+	fi
+	_GL=${GAS_LIMIT_DEPLOY} _call deploy --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME}
 }
 
 function init() {
@@ -151,6 +163,23 @@ function withdraw() {
 		return 1
 	fi
 	_call admin withdraw --bridge ${BRIDGE_ADDR} --handler ${ERC20_HANDLER} --tokenContract ${ERC20_ADDR} --amountOrId $amountOrId --recipient $recipient
+}
+
+function set_threshold() {
+	if [[ "$1" == "" ]]; then
+		echo "usage: $0 set_threshold {size}" >&1
+		return 1
+	fi
+	_call admin set-threshold --bridge ${BRIDGE_ADDR} --threshold $1
+}
+
+function add_relayer() {
+	if [[ "$1" == "" ]]; then
+		echo "usage: $0 add_relayer {idx}" >&1
+		return 1
+	fi
+	relayer=$(echo $RELAYERS | _to_list $1 | tail -n 1)
+	_call admin add-relayer --bridge ${BRIDGE_ADDR} --relayer $relayer
 }
 
 function deposit() {
