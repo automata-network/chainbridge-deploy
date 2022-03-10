@@ -72,9 +72,13 @@ function _mint_erc20_one() {
 }
 
 function mint_erc20() {
-	echo $TESTS | _to_list | while read to; do
-		_mint_erc20_one ${DEPLOY_ACCOUNT_PRIVATE_KEY} $to
-	done
+	if [[ "$1" == "" ]]; then
+		echo $TESTS | _to_list | while read to; do
+			_mint_erc20_one ${DEPLOY_ACCOUNT_PRIVATE_KEY} $to
+		done
+	else
+		_mint_erc20_one ${DEPLOY_ACCOUNT_PRIVATE_KEY} $1
+	fi
 }
 
 function mint_erc20_to_handler() {
@@ -119,7 +123,7 @@ function deploy() {
 		echo "missing env DEPLOY_ACCOUNT_PRIVATE_KEY" >&2
 		return 1
 	fi
-	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --erc20Handler --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME}
+	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --erc20Handler --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME} --expiry 10000000
 }
 
 function add_token() {

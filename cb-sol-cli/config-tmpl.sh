@@ -25,8 +25,8 @@ function _tmpl_chain() {
 			"type": "ethereum",
 			"id": ${DOMAIN_ID},
 			"blockStorePath": "chainbridge.${NETWORK_NAME}.db",
-			"blockConfirmations": 1,
-			"pollingIntervalSecs": 1,
+			"blockConfirmations": 4,
+			"pollingIntervalSecs": 5,
 			"cacheTtl": 300,
 			"endpoint": "${NETWORK_RPC}",
 			"opts": {
