@@ -8,13 +8,18 @@ const mintCmd = new Command("mint")
     .description("Mint tokens")
     .option('--erc721Address <address>', 'ERC721 contract address', constants.ERC721_ADDRESS)
     .option('--id <id>', "Token id", "0x1")
+    .option('--recipient <address>', "Dest Address", "")
     .option('--metadata <bytes>', "Metadata (tokenURI) for token", "")
     .action(async function (args) {
         await setupParentArgs(args, args.parent.parent)
         const erc721Instance = new ethers.Contract(args.erc721Address, constants.ContractABIs.Erc721Mintable.abi, args.wallet);
+        let recipient = args.recipient;
+        if (recipient == "") {
+            recipient = args.wallet.address;
+        }
 
-        log(args, `Minting token with id ${args.id} to ${args.wallet.address} on contract ${args.erc721Address}!`);
-        const tx = await erc721Instance.mint(args.wallet.address, ethers.utils.hexlify(args.id), args.metadata);
+        log(args, `Minting token with id ${args.id} to ${recipient} on contract ${args.erc721Address}!`);
+        const tx = await erc721Instance.mint(recipient, ethers.utils.hexlify(args.id), args.metadata);
         await waitForTx(args.provider, tx.hash)
     })
 
@@ -36,7 +41,7 @@ const addMinterCmd = new Command("add-minter")
     .action(async function (args) {
         await setupParentArgs(args, args.parent.parent)
         const erc721Instance = new ethers.Contract(args.erc721Address, constants.ContractABIs.Erc721Mintable.abi, args.wallet);
-        const MINTER_ROLE = await erc721Instance.MINTER_ROLE()
+        const MINTER_ROLE = "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6";
         log(args, `Adding ${args.minter} as a minter of ${args.erc721Address}`)
         const tx = await erc721Instance.grantRole(MINTER_ROLE, args.minter);
         await waitForTx(args.provider, tx.hash)

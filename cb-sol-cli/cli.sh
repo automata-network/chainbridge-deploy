@@ -57,9 +57,15 @@ function _env() {
 	export NETWORK_RPC=$(env_value NETWORK_RPC $network)
 	export ERC20_SYMBOL=$TOKEN
 	export ERC20_NAME=$(env_value ERC20_NAME $ERC20_SYMBOL)
-	export ERC20_HANDLER=$(env_value ERC20_HANDLER $network)
-	export RESOURCE_ID=$(env_value RESOURCE_ID $ERC20_SYMBOL)
 	export ERC20_ADDR=$(env_value ERC20_ADDR_${ERC20_SYMBOL} $network)
+	export ERC20_HANDLER=$(env_value ERC20_HANDLER $network)
+	export ERC721_SYMBOL=$NFT
+	export ERC721_NAME=$(env_value ERC721_NAME $ERC721_SYMBOL)
+	export ERC721_BASEURI=$(env_value ERC721_BASEURI $ERC721_SYMBOL)
+	export ERC721_ADDR=$(env_value ERC721_ADDR_${ERC721_SYMBOL} $network)
+	export ERC721_HANDLER=$(env_value ERC721_HANDLER $network)
+	export RESOURCE_ID=$(env_value RESOURCE_ID $ERC20_SYMBOL)
+	export NFT_RESOURCE_ID=$(env_value RESOURCE_ID $ERC721_SYMBOL)
 	export BRIDGE_ADDR=$(env_value BRIDGE_ADDR $network)
 	if [[ "$CHAIN_ID" == "" ]]; then
 		echo "invalid network: $1" >&2
@@ -68,7 +74,33 @@ function _env() {
 }
 
 function _mint_erc20_one() {
-	_PK=$1 _call erc20 mint --amount 100000 --erc20Address ${ERC20_ADDR} --recipient "$2"
+	_PK=$1 _call erc20 mint --amount 1000000 --erc20Address ${ERC20_ADDR} --recipient "$2"
+}
+
+function _mint_erc721_one() {
+	_PK=$1 _call erc721 mint --erc721Address ${ERC721_ADDR} --id $3 --recipient $2
+}
+
+function mint_erc721() {
+	if [[ "$1" == "" ]]; then
+		echo "usage: mint_erc721 <token>"
+		exit 1
+	fi
+	dest=$(echo $TESTS | _to_list 1)
+	echo $dest
+	_mint_erc721_one ${DEPLOY_ACCOUNT_PRIVATE_KEY} $dest $1
+	approve_nft $1
+}
+
+function approve_nft() {
+	if [[ "$1" == "" ]]; then
+		echo "usage: approve_nft <token>"
+		exit 1
+	fi
+	
+
+	pk=$(echo $TESTS_PRIVATE_KEY | _to_list 1)
+	_approve_erc721 $pk $1
 }
 
 function mint_erc20() {
@@ -83,6 +115,10 @@ function mint_erc20() {
 
 function mint_erc20_to_handler() {
 	_mint_erc20_one ${DEPLOY_ACCOUNT_PRIVATE_KEY} $ERC20_HANDLER
+}
+
+function _approve_erc721() {
+	_PK=$1 _call erc721 approve --id $2 --recipient ${ERC721_HANDLER} --erc721Address ${ERC721_ADDR}
 }
 
 function _approve() {
@@ -118,12 +154,32 @@ function add_resource() {
 	_GL=${GAS_LIMIT_2} _call bridge register-resource --bridge ${BRIDGE_ADDR} --handler ${ERC20_HANDLER} --targetContract ${ERC20_ADDR} --resourceId ${RESOURCE_ID} 
 }
 
+function add_nft_resource() {
+	_GL=${GAS_LIMIT_2} _call bridge register-resource --bridge ${BRIDGE_ADDR} --handler ${ERC721_HANDLER} --targetContract ${ERC721_ADDR} --resourceId ${NFT_RESOURCE_ID} 
+}
+
 function deploy() {
 	if [[ "$DEPLOY_ACCOUNT_PRIVATE_KEY" == "" ]]; then
 		echo "missing env DEPLOY_ACCOUNT_PRIVATE_KEY" >&2
 		return 1
 	fi
-	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --erc20Handler --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME} --expiry 10000000
+	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --erc20Handler --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME} --expiry 10000000 --erc721Handler --erc721Symbol ${ERC721_SYMBOL} --erc721Name ${ERC721_NAME} --erc721BaseUri ${ERC721_BASEURI} --erc721
+}
+
+function add_nft_handler() {
+	if [[ "$DEPLOY_ACCOUNT_PRIVATE_KEY" == "" ]]; then
+		echo "missing env DEPLOY_ACCOUNT_PRIVATE_KEY" >&2
+		return 1
+	fi
+	_GL=${GAS_LIMIT_DEPLOY} _call deploy --erc721Handler --chainId ${DOMAIN_ID} --bridgeAddress ${BRIDGE_ADDR}
+}
+
+function add_nft() {
+	if [[ "$DEPLOY_ACCOUNT_PRIVATE_KEY" == "" ]]; then
+		echo "missing env DEPLOY_ACCOUNT_PRIVATE_KEY" >&2
+		return 1
+	fi
+	_GL=${GAS_LIMIT_DEPLOY} _call deploy --erc721 --chainId ${DOMAIN_ID} --erc721Symbol ${ERC721_SYMBOL} --erc721Name ${ERC721_NAME} --erc721BaseUri ${ERC721_BASEURI}
 }
 
 function add_token() {
@@ -134,7 +190,21 @@ function add_token() {
 	_GL=${GAS_LIMIT_DEPLOY} _call deploy --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME}
 }
 
+function init_nft() {
+	echo 'add nft resource'
+	add_nft_resource
+	echo 'setup burnable'
+	_call bridge set-burn --bridge ${BRIDGE_ADDR} --handler ${ERC721_HANDLER} --tokenContract ${ERC721_ADDR}
+	echo 'add minter'
+	_call erc721 add-minter --erc721Address ${ERC721_ADDR} --minter ${ERC721_HANDLER}
+}
+
 function init() {
+	init_erc20
+	init_nft
+}
+
+function init_erc20() {
 	echo 'mint erc20...'
 	mint_erc20
 	echo 'approve'
@@ -153,9 +223,9 @@ function _call() {
 		export _GL=${GAS_LIMIT}
 	fi
 	if [[ "$DEBUG" != "" ]]; then
-		echo cb-sol-cli --privateKey $_PK --url ${NETWORK_RPC} --gasLimit $_GL --gasPrice ${GAS_PRICE} $@
+		echo ./index.js --privateKey $_PK --url ${NETWORK_RPC} --gasLimit $_GL --gasPrice ${GAS_PRICE} $@
 	else
-		cb-sol-cli --privateKey $_PK --url ${NETWORK_RPC} --gasLimit $_GL --gasPrice ${GAS_PRICE} $@
+		./index.js --privateKey $_PK --url ${NETWORK_RPC} --gasLimit $_GL --gasPrice ${GAS_PRICE} $@
 	fi
 }
 
@@ -184,6 +254,32 @@ function add_relayer() {
 	fi
 	relayer=$(echo $RELAYERS | _to_list $1 | tail -n 1)
 	_call admin add-relayer --bridge ${BRIDGE_ADDR} --relayer $relayer
+}
+
+function mint_deposit_nft() {
+	mint_erc721 $3
+	deposit_nft $@
+}
+
+function approve_deposit_nft() {
+	approve_nft $3
+	deposit_nft $@
+}
+
+function deposit_nft() {
+	if [[ "$2" == "" ]]; then
+		echo "usage $0"' deposit ${destNetworkName} ${recipient}' >&2
+		return 1
+	fi
+	dest=$(env_value DOMAIN_ID $(upper $1))
+	if [[ "$dest" == "" ]]; then
+		dest=$(env_value CHAIN_ID $(upper $1))
+	fi
+	recipient=$2
+	tokenId=$3
+	echo $TESTS_PRIVATE_KEY | _to_list 1 | while read pk; do
+		_PK=$pk _GL=${GAS_LIMIT_2} _call erc721 deposit --resourceId ${NFT_RESOURCE_ID} --bridge ${BRIDGE_ADDR} --dest $dest --recipient $recipient --id $tokenId
+	done
 }
 
 function deposit() {

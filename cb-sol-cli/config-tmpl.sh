@@ -34,6 +34,7 @@ function _tmpl_chain() {
 				"privateKey": "$2",
 				"bridge": "${BRIDGE_ADDR}",
 				"erc20Handler": "${ERC20_HANDLER}",
+				"erc721Handler": "${ERC721_HANDLER}",
 				"gasLimit": "1000000",
 				"defaultGasPrice": "20000000"
 			}
