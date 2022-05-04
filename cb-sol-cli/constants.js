@@ -8,10 +8,13 @@ const CONTRACT_PATH = "./chainbridge-solidity/build/contracts"
 const ContractABIs = {
     Bridge: require(CONTRACT_PATH + "/Bridge.json"),
     Erc20Handler: require(CONTRACT_PATH + "/ERC20Handler.json"),
-    Erc20Mintable: require("./contracts/ERC20Custom.json"),
+    // Erc20Mintable: require("./contracts/ERC20Custom.json"),
+    Erc20Mintable: require(CONTRACT_PATH + "/ERC20Example.json"),
     Erc721Handler: require(CONTRACT_PATH + "/ERC721Handler.json"),
     Erc721Mintable: require(CONTRACT_PATH + "/ERC721MinterBurnerPauser.json"),
     GenericHandler: require(CONTRACT_PATH + "/GenericHandler.json"),
+    RollupHandler: require(CONTRACT_PATH + "/RollupHandler.json"),
+    RollupExample: require(CONTRACT_PATH + "/RollupExample.json"),
     CentrifugeAssetStore: require(CONTRACT_PATH + "/CentrifugeAsset.json"),
     WETC: require("./contracts/WETC.json"),
     HandlerHelpers: require(CONTRACT_PATH + "/HandlerHelpers.json")

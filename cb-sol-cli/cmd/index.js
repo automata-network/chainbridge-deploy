@@ -3,6 +3,7 @@ const bridge = require("./bridge")
 const admin = require("./admin")
 const erc20 = require("./erc20");
 const erc721 = require("./erc721");
+const rollup = require("./rollup");
 const centrifuge = require("./centrifuge");
 
 module.exports = {
@@ -11,5 +12,6 @@ module.exports = {
     admin,
     erc20,
     erc721,
+    rollup,
     centrifuge,
 }

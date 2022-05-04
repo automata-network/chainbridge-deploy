@@ -40,7 +40,7 @@ function _to_list() {
 
 function upper() {
 	echo $1 | awk '{print toupper($0)}'
-} 
+}
 
 function env_value() {
 	eval echo '$'$1'_'$2
@@ -55,17 +55,26 @@ function _env() {
 	fi
 	export NETWORK_NAME=$network
 	export NETWORK_RPC=$(env_value NETWORK_RPC $network)
+
 	export ERC20_SYMBOL=$TOKEN
 	export ERC20_NAME=$(env_value ERC20_NAME $ERC20_SYMBOL)
 	export ERC20_ADDR=$(env_value ERC20_ADDR_${ERC20_SYMBOL} $network)
 	export ERC20_HANDLER=$(env_value ERC20_HANDLER $network)
+
 	export ERC721_SYMBOL=$NFT
 	export ERC721_NAME=$(env_value ERC721_NAME $ERC721_SYMBOL)
 	export ERC721_BASEURI=$(env_value ERC721_BASEURI $ERC721_SYMBOL)
 	export ERC721_ADDR=$(env_value ERC721_ADDR_${ERC721_SYMBOL} $network)
 	export ERC721_HANDLER=$(env_value ERC721_HANDLER $network)
+
+	export ROLLUP_SYMBOL=$ROLLUP
+	export ROLLUP_HANDLER=$(env_value ROLLUP_HANDLER $network)
+	export ROLLUP_ADDR=$(env_value ROLLUP_ADDR_${ROLLUP_SYMBOL} $network)
+	# echo ROLLUP_ADDR_${ROLLUP_SYMBOL} $network;
+
 	export RESOURCE_ID=$(env_value RESOURCE_ID $ERC20_SYMBOL)
 	export NFT_RESOURCE_ID=$(env_value RESOURCE_ID $ERC721_SYMBOL)
+	export ROLLUP_RESOURCE_ID=$(env_value RESOURCE_ID $ROLLUP_SYMBOL)
 	export BRIDGE_ADDR=$(env_value BRIDGE_ADDR $network)
 	if [[ "$CHAIN_ID" == "" ]]; then
 		echo "invalid network: $1" >&2
@@ -117,6 +126,15 @@ function mint_erc20_to_handler() {
 	_mint_erc20_one ${DEPLOY_ACCOUNT_PRIVATE_KEY} $ERC20_HANDLER
 }
 
+function erc20_balance() {
+	addr=$1
+	if [[ "$addr" == "" ]]; then
+		echo "usage: $0 erc20_balance <addr>"
+		return 1
+	fi
+	_call erc20 balance --address $addr --erc20Address ${ERC20_ADDR}
+}
+
 function _approve_erc721() {
 	_PK=$1 _call erc721 approve --id $2 --recipient ${ERC721_HANDLER} --erc721Address ${ERC721_ADDR}
 }
@@ -139,6 +157,28 @@ function gen_config() {
 	source ./config-tmpl.sh
 	pk=$(echo $RELAYERS_PRIVATE_KEY | _to_list $n | tail -n 1)
 	_tmpl_header
+	_tmpl_keys
+	__comma1=""
+	__idx="0"
+	echo $RELAYERS_PRIVATE_KEY | _to_list | while read role; do
+		cat <<EOF
+		$__comma1"relayer-$__idx": [
+EOF
+		echo $NETWORKS | _to_list | while read name; do
+			_env $name
+			_tmpl_chain_keys_chain "$__comma" $role
+			if [[ "$__comma" == "" ]]; then
+				__comma=,
+			fi
+		done
+		echo "		]"
+		if [[ "$__comma1" == "" ]]; then
+			__comma1=,
+		fi
+		__idx=$(expr $__idx + 1)
+	done
+	echo "	},"
+	_tmpl_chain_header
 	__comma=""
 	echo $NETWORKS | _to_list | while read name; do 
 		_env $name
@@ -158,12 +198,24 @@ function add_nft_resource() {
 	_GL=${GAS_LIMIT_2} _call bridge register-resource --bridge ${BRIDGE_ADDR} --handler ${ERC721_HANDLER} --targetContract ${ERC721_ADDR} --resourceId ${NFT_RESOURCE_ID} 
 }
 
+function add_rollup_resource() {
+	_GL=${GAS_LIMIT_2} _call bridge register-resource --bridge ${BRIDGE_ADDR} --handler ${ROLLUP_HANDLER} --targetContract ${ROLLUP_ADDR} --resourceId ${ROLLUP_RESOURCE_ID} 
+}
+
 function deploy() {
 	if [[ "$DEPLOY_ACCOUNT_PRIVATE_KEY" == "" ]]; then
 		echo "missing env DEPLOY_ACCOUNT_PRIVATE_KEY" >&2
 		return 1
 	fi
-	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --erc20Handler --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME} --expiry 10000000 --erc721Handler --erc721Symbol ${ERC721_SYMBOL} --erc721Name ${ERC721_NAME} --erc721BaseUri ${ERC721_BASEURI} --erc721
+	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --rollupHandler --rollupExample --rollupResourceID ${ROLLUP_RESOURCE_ID} --erc20Handler --erc20 --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --erc20Symbol ${ERC20_SYMBOL} --erc20Name ${ERC20_NAME} --expiry 10000000 --erc721Handler --erc721Symbol ${ERC721_SYMBOL} --erc721Name ${ERC721_NAME} --erc721BaseUri ${ERC721_BASEURI} --erc721
+}
+
+function deploy_rollup() {
+	if [[ "$DEPLOY_ACCOUNT_PRIVATE_KEY" == "" ]]; then
+		echo "missing env DEPLOY_ACCOUNT_PRIVATE_KEY" >&2
+		return 1
+	fi
+	_GL=${GAS_LIMIT_DEPLOY} _call deploy --bridge --rollupHandler --rollupExample --rollupResourceID ${ROLLUP_RESOURCE_ID} --chainId ${DOMAIN_ID} --relayerThreshold ${THRESHOLD} --relayers ${RELAYERS} --expiry 10000000
 }
 
 function add_nft_handler() {
@@ -198,6 +250,7 @@ function init_nft() {
 	echo 'add minter'
 	_call erc721 add-minter --erc721Address ${ERC721_ADDR} --minter ${ERC721_HANDLER}
 }
+
 
 function init() {
 	init_erc20
@@ -265,6 +318,40 @@ function approve_deposit_nft() {
 	approve_nft $3
 	deposit_nft $@
 }
+
+function rollup_transfer() {
+	if [[ "$2" == "" ]]; then
+		echo "usage $0"' deposit ${destNetworkName} ${recipient} ${tokenId}' >&2
+		return 1
+	fi
+	recipient=$1
+	tokenId=$2
+	pk=$(echo $DEPLOY_ACCOUNT_PRIVATE_KEY | _to_list 1)
+	_PK=$pk _GL=${GAS_LIMIT_2} _call rollup transfer --rollupExample ${ROLLUP_ADDR} --recipient ${recipient} --token ${tokenId}
+}
+
+function rollup() {
+	dest=$(env_value DOMAIN_ID $(upper $1))
+	if [[ "$dest" == "" ]]; then
+		dest=$(env_value CHAIN_ID $(upper $1))
+	fi
+	# pk=$(echo $DEPLOY_ACCOUNT_PRIVATE_KEY | _to_list 1)
+	_GL=${GAS_LIMIT_2} _call rollup rollup --rollupExample ${ROLLUP_ADDR} --destDomainId $dest --resourceID ${ROLLUP_RESOURCE_ID}
+}
+
+function _domain_id() {
+	dest=$(env_value DOMAIN_ID $(upper $1))
+	if [[ "$dest" == "" ]]; then
+		dest=$(env_value CHAIN_ID $(upper $1))
+	fi
+	echo $dest
+}
+
+function erc20_rollup() {
+	dest=$(_domain_id $1)
+	_call erc20 rollup --resourceID ${RESOURCE_ID} --batch 100 --destDomainId $dest --address ${ERC20_ADDR}
+}
+
 
 function deposit_nft() {
 	if [[ "$2" == "" ]]; then

@@ -7,6 +7,11 @@ function _tmpl_header() {
 		"retryTime": 10,
 		"retryInternalSecs": 5
 	},
+EOF
+}
+
+function _tmpl_chain_header() {
+	cat <<EOF
    	"chains": [
 EOF
 }
@@ -15,6 +20,21 @@ function _tmpl_footer() {
     cat <<EOF
     ]
 }
+EOF
+}
+
+function _tmpl_keys() {
+	cat <<EOF
+	"keys": {
+EOF
+}
+
+function _tmpl_chain_keys_chain() {
+	cat <<EOF
+			$1{
+				"id": ${DOMAIN_ID},
+				"privateKey": "$2"
+			}
 EOF
 }
 
@@ -35,6 +55,7 @@ function _tmpl_chain() {
 				"bridge": "${BRIDGE_ADDR}",
 				"erc20Handler": "${ERC20_HANDLER}",
 				"erc721Handler": "${ERC721_HANDLER}",
+				"rollupHandler": "${ROLLUP_HANDLER}",
 				"gasLimit": "1000000",
 				"defaultGasPrice": "20000000"
 			}

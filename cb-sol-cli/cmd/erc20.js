@@ -99,6 +99,20 @@ const balanceCmd = new Command("balance")
         log(args, `Account ${args.address} has a balance of ${ethers.utils.formatUnits(balance, decimals)}` )
     })
 
+const rollupCmd = new Command("rollup")
+    .description("trigger rollup")
+    .option('--address <address>', 'contract address', "")
+    .option('--batch <batch>', 'contract address', 100)
+    .option('--destDomainId <domainId>', 'RollupExample contract address', 0)
+    .option('--resourceID <resourceID>', 'resourceID', "")
+    .action(async function (args) {
+        await setupParentArgs(args, args.parent.parent)
+
+        const exampleInstance = new ethers.Contract(args.address, constants.ContractABIs.Erc20Mintable.abi, args.wallet);
+        const tx = await exampleInstance.rollupToOtherChain(args.destDomainId, args.resourceID, args.batch);
+        await waitForTx(args.provider, tx.hash);
+    })
+
 const allowanceCmd = new Command("allowance")
     .description("Get the allowance of a spender for an address")
     .option('--spender <address>', 'Address of spender', constants.ERC20_HANDLER_ADDRESS)
@@ -161,5 +175,6 @@ erc20Cmd.addCommand(balanceCmd)
 erc20Cmd.addCommand(allowanceCmd)
 erc20Cmd.addCommand(wetcDepositCmd)
 erc20Cmd.addCommand(proposalDataHashCmd)
+erc20Cmd.addCommand(rollupCmd)
 
 module.exports = erc20Cmd

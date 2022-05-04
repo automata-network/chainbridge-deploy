@@ -10,6 +10,7 @@ const {
     admin,
     erc20,
     erc721,
+    rollup,
     centrifuge,
 } = require('./cmd/index');
 const constants = require('./constants');
@@ -28,6 +29,7 @@ program.addCommand(bridge)
 program.addCommand(admin)
 program.addCommand(erc20)
 program.addCommand(erc721)
+program.addCommand(rollup)
 program.addCommand(centrifuge)
 
 program.allowUnknownOption(false);
